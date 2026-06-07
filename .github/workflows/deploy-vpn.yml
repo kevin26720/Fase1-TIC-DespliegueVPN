@@ -75,7 +75,7 @@ jobs:
       # 3.5. Connect to Tailscale Private Network (if TAILSCALE_AUTH_KEY is provided)
       # This registers the GitHub Actions runner into your private Tailnet.
       - name: Connect to Tailscale Network
-        if: github.ref == 'refs/heads/main' && env.HAS_SECRETS == 'true' && env.HAS_TAILSCALE == 'true'
+        if: github.ref == 'refs/heads/master' && env.HAS_SECRETS == 'true' && env.HAS_TAILSCALE == 'true'
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
@@ -84,9 +84,9 @@ jobs:
           HAS_TAILSCALE: ${{ secrets.TAILSCALE_AUTH_KEY != '' }}
 
       # 4. Automated deployment to target server via SSH/SCP
-      # Excluded on PRs; runs only on pushes to main if deployment secrets are configured
+      # Excluded on PRs; runs only on pushes to master if deployment secrets are configured
       - name: Deploy to Remote Target Server
-        if: github.ref == 'refs/heads/main' && env.HAS_SECRETS == 'true'
+        if: github.ref == 'refs/heads/master' && env.HAS_SECRETS == 'true'
         env:
           TARGET_HOST: ${{ secrets.TARGET_HOST }}
           TARGET_USER: ${{ secrets.TARGET_USER }}
