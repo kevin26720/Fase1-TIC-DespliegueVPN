@@ -47,6 +47,11 @@ echo "[INFO] Extracting files and starting containers on target..."
 ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no "$TARGET_USER@$TARGET_HOST" << EOF
     cd "$DEPLOY_DIR"
     
+    # Create isolated Docker config to bypass credential helper errors in non-interactive SSH sessions
+    mkdir -p docker_config
+    echo '{"auths": {}}' > docker_config/config.json
+    export DOCKER_CONFIG="\$(pwd)/docker_config"
+    
     echo "[INFO] Extracting release..."
     tar -xzf "$TAR_FILE"
     rm -f "$TAR_FILE"
