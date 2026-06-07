@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # HAProxy Load Balancer (TCP Sticky Sessions)
+  # ==========================================
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: haproxy-lb
+    ports:
+      - "1194:1194"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - vpn_network
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  # ==========================================
+  # OpenVPN Server - Node 1
+  # ==========================================
+  openvpn-node1:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+    container_name: openvpn-node1
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    read_only: true
+    tmpfs:
+      - /run
+      - /var/log/openvpn
+    volumes:
+      - ./docker/config/server-node1.conf:/etc/openvpn/openvpn.conf:ro
+      - ./docker/config/pki:/etc/openvpn/pki:ro
+      - ./docker/config/crl:/etc/openvpn/crl:ro  # Bind mount of the host CRL directory
+    networks:
+      - vpn_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    command: ["/etc/openvpn/openvpn.conf"]
+    restart: unless-stopped
+
+  # ==========================================
+  # OpenVPN Server - Node 2
+  # ==========================================
+  openvpn-node2:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+    container_name: openvpn-node2
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    read_only: true
+    tmpfs:
+      - /run
+      - /var/log/openvpn
+    volumes:
+      - ./docker/config/server-node2.conf:/etc/openvpn/openvpn.conf:ro
+      - ./docker/config/pki:/etc/openvpn/pki:ro
+      - ./docker/config/crl:/etc/openvpn/crl:ro  # Bind mount of the host CRL directory
+    networks:
+      - vpn_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    command: ["/etc/openvpn/openvpn.conf"]
+    restart: unless-stopped
+
+# Network configuration (dynamically allocated to prevent conflicts)
+networks:
+  vpn_network:

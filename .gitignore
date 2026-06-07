@@ -1,0 +1,14 @@
+# Exclude generated local test credentials (vital for security)
+docker/config/pki/
+
+# Exclude temporary deployment packages
+deploy.tar.gz
+*.tar.gz
+
+# Exclude temporary HTML reports (generated dynamically in pipeline)
+tests/compliance-dashboard.html
+tests/compliance-summary.md
+
+# OS specific files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,98 @@
+name: Hardened OpenVPN CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ==========================================
+  # Job 1: Security & Policy Compliance Audit
+  # ==========================================
+  security-and-policy:
+    name: Policy as Code & Security Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Validate Dockerfile using Hadolint
+      - name: Lint Dockerfile (Hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ./docker/Dockerfile
+          ignore: DL3018 # Ignore unpinned package versions in Alpine for easier security updates
+
+      # 2. Run custom OpenVPN linter and configuration compliance auditor
+      # This step writes directly to the native GITHUB_STEP_SUMMARY dashboard
+      - name: OpenVPN Config & Compose Security Linter
+        run: |
+          chmod +x ./tests/check-config.sh
+          ./tests/check-config.sh
+
+      # 3. Archive the generated glassmorphic compliance dashboard as an artifact
+      # Runs 'always()' so the user can download and inspect reports even when audits fail
+      - name: Upload Compliance Report Dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: tests/compliance-dashboard.html
+
+  # ==========================================
+  # Job 2: Secure Build, Scan & Auto-Deploy
+  # ==========================================
+  build-and-deploy:
+    name: Build, Container Scan & Deploy
+    needs: security-and-policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Setup Docker Buildx to verify image builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 2. Build local Docker image for scanning
+      - name: Build Local Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile
+          tags: openvpn-hardened:latest
+          outputs: type=docker,dest=/tmp/image.tar
+
+      # 3. Scan built container image for OS/package level vulnerabilities (Trivy)
+      - name: Scan Image for Vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          input: /tmp/image.tar
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1' # Break the pipeline if critical or high CVEs are found
+
+      # 3.5. Connect to Tailscale Private Network (if TAILSCALE_AUTH_KEY is provided)
+      # This registers the GitHub Actions runner into your private Tailnet.
+      - name: Connect to Tailscale Network
+        if: github.ref == 'refs/heads/main' && env.HAS_SECRETS == 'true' && env.HAS_TAILSCALE == 'true'
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        env:
+          HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
+          HAS_TAILSCALE: ${{ secrets.TAILSCALE_AUTH_KEY != '' }}
+
+      # 4. Automated deployment to target server via SSH/SCP
+      # Excluded on PRs; runs only on pushes to main if deployment secrets are configured
+      - name: Deploy to Remote Target Server
+        if: github.ref == 'refs/heads/main' && env.HAS_SECRETS == 'true'
+        env:
+          TARGET_HOST: ${{ secrets.TARGET_HOST }}
+          TARGET_USER: ${{ secrets.TARGET_USER }}
+          TARGET_KEY: ${{ secrets.TARGET_SSH_KEY }}
+          TARGET_PORT: ${{ secrets.TARGET_PORT }}
+          HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
+        run: |
+          chmod +x ./scripts/deploy-target.sh
+          ./scripts/deploy-target.sh

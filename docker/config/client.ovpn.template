@@ -1,0 +1,50 @@
+# ==========================================
+# Hardened OpenVPN Client Configuration Template
+# ==========================================
+client
+dev tun
+proto tcp             # Matches the server TCP mode for HAProxy sticky sessions
+
+# Active-Active Load Balancing and Failover
+# Add the hostnames or IP addresses of your load-balanced endpoints below:
+remote vpn.tu-dominio.lat 1194
+remote vpn-backup.tu-dominio.lat 1194
+remote-random         # Randomize server list on start to distribute load
+
+# Connection Persistence
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+
+# Cryptographic Security
+cipher AES-256-GCM
+tls-version-min 1.2
+tls-cipher TLS-ECDHE-RSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384:TLS-DHE-RSA-WITH-AES-256-GCM-SHA384
+
+# MitM Protection (Mandatory)
+# Verifies that the server certificate has the 'server' flag set
+remote-cert-tls server
+
+# Logging verbosity
+verb 3
+mute 20
+
+# Inline PKI Cryptographic Blocks
+# (Paste keys/certs directly inside these tags or use automation to generate)
+
+<ca>
+# CA Cert goes here
+</ca>
+
+<cert>
+# Client Cert goes here
+</cert>
+
+<key>
+# Client Private Key goes here
+</key>
+
+<tls-crypt>
+# tls-crypt key goes here
+</tls-crypt>
