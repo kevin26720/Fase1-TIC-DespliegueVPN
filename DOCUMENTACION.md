@@ -124,3 +124,4 @@ Para habilitar el despliegue automático al servidor destino, debes configurar l
 - `TARGET_SSH_KEY`: La clave privada SSH (completa) autorizada en el servidor destino.
 - `TARGET_PORT` *(Opcional)*: El puerto SSH del servidor destino (por defecto es `22`).
 - `TAILSCALE_AUTH_KEY` *(Opcional)*: Tu clave de autenticación de Tailscale (Auth Key o Ephemeral Key). Si se proporciona, el pipeline de GitHub Actions se conectará automáticamente a tu red privada (Tailnet) antes de realizar el despliegue por SSH, permitiendo conectarse de forma 100% segura a máquinas privadas sin exponerlas a Internet.
+## Git
