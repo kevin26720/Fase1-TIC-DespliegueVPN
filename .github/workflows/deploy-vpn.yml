@@ -47,6 +47,9 @@ jobs:
     name: Build, Container Scan & Deploy
     needs: security-and-policy
     runs-on: ubuntu-latest
+    env:
+      HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
+      HAS_TAILSCALE: ${{ secrets.TAILSCALE_AUTH_KEY != '' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -79,9 +82,6 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        env:
-          HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
-          HAS_TAILSCALE: ${{ secrets.TAILSCALE_AUTH_KEY != '' }}
 
       # 4. Automated deployment to target server via SSH/SCP
       # Excluded on PRs; runs only on pushes to master if deployment secrets are configured
@@ -92,7 +92,6 @@ jobs:
           TARGET_USER: ${{ secrets.TARGET_USER }}
           TARGET_KEY: ${{ secrets.TARGET_SSH_KEY }}
           TARGET_PORT: ${{ secrets.TARGET_PORT }}
-          HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
         run: |
           chmod +x ./scripts/deploy-target.sh
           ./scripts/deploy-target.sh
