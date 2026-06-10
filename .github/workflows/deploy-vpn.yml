@@ -47,9 +47,6 @@ jobs:
     name: Build, Container Scan & Deploy
     needs: security-and-policy
     runs-on: ubuntu-latest
-    env:
-      HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
-      HAS_TAILSCALE: ${{ secrets.TAILSCALE_AUTH_KEY != '' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -58,22 +55,45 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 2. Build local Docker image for scanning
-      - name: Build Local Image
+      # 2. Build local OpenVPN image for scanning
+      - name: Build Local OpenVPN Image
         uses: docker/build-push-action@v5
         with:
           context: ./docker
           file: ./docker/Dockerfile
           tags: openvpn-hardened:latest
-          outputs: type=docker,dest=/tmp/image.tar
+          outputs: type=docker,dest=/tmp/vpn-image.tar
 
-      # 3. Scan built container image for OS/package level vulnerabilities (Trivy)
-      - name: Scan Image for Vulnerabilities (Trivy)
+      # 3. Build local Frontend image for scanning
+      - name: Build Local Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          tags: vpn-frontend:latest
+          outputs: type=docker,dest=/tmp/frontend-image.tar
+
+      # 4. Scan OpenVPN image for vulnerabilities (Trivy)
+      - name: Scan OpenVPN Image (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
-          input: /tmp/image.tar
+          input: /tmp/vpn-image.tar
           severity: 'CRITICAL,HIGH'
-          exit-code: '1' # Break the pipeline if critical or high CVEs are found
+          exit-code: '1'
+
+      # 5. Scan Frontend image for vulnerabilities (Trivy)
+      - name: Scan Frontend Image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          input: /tmp/frontend-image.tar
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      # 6. Run E2E Integration Tests (Blocking verification step)
+      - name: Run E2E Integration Tests
+        run: |
+          chmod +x ./tests/integration-test.sh
+          ./tests/integration-test.sh
 
       # 3.5. Connect to Tailscale Private Network (if TAILSCALE_AUTH_KEY is provided)
       # This registers the GitHub Actions runner into your private Tailnet.
@@ -82,6 +102,9 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        env:
+          HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
+          HAS_TAILSCALE: ${{ secrets.TAILSCALE_AUTH_KEY != '' }}
 
       # 4. Automated deployment to target server via SSH/SCP
       # Excluded on PRs; runs only on pushes to master if deployment secrets are configured
@@ -92,6 +115,7 @@ jobs:
           TARGET_USER: ${{ secrets.TARGET_USER }}
           TARGET_KEY: ${{ secrets.TARGET_SSH_KEY }}
           TARGET_PORT: ${{ secrets.TARGET_PORT }}
+          HAS_SECRETS: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_SSH_KEY != '' }}
         run: |
           chmod +x ./scripts/deploy-target.sh
           ./scripts/deploy-target.sh

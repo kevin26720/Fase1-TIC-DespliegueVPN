@@ -12,3 +12,9 @@ tests/compliance-summary.md
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# IDE settings
+.vscode/
+
+# Dynamically generated CRL list
+docker/config/crl/

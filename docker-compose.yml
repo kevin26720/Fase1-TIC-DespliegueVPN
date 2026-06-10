@@ -24,17 +24,21 @@ services:
     build:
       context: ./docker
       dockerfile: Dockerfile
+    image: openvpn-hardened:latest
     container_name: openvpn-node1
     cap_drop:
       - ALL
     cap_add:
       - NET_ADMIN
+      - SETUID
+      - SETGID
     devices:
       - /dev/net/tun:/dev/net/tun
     read_only: true
     tmpfs:
       - /run
       - /var/log/openvpn
+      - /tmp
     volumes:
       - ./docker/config/server-node1.conf:/etc/openvpn/openvpn.conf:ro
       - ./docker/config/pki:/etc/openvpn/pki:ro
@@ -57,17 +61,21 @@ services:
     build:
       context: ./docker
       dockerfile: Dockerfile
+    image: openvpn-hardened:latest
     container_name: openvpn-node2
     cap_drop:
       - ALL
     cap_add:
       - NET_ADMIN
+      - SETUID
+      - SETGID
     devices:
       - /dev/net/tun:/dev/net/tun
     read_only: true
     tmpfs:
       - /run
       - /var/log/openvpn
+      - /tmp
     volumes:
       - ./docker/config/server-node2.conf:/etc/openvpn/openvpn.conf:ro
       - ./docker/config/pki:/etc/openvpn/pki:ro
@@ -83,6 +91,26 @@ services:
     command: ["/etc/openvpn/openvpn.conf"]
     restart: unless-stopped
 
+  # ==========================================
+  # Next.js Web Portal (VPN Frontend)
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vpn-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./docker/config/pki:/etc/openvpn/pki:ro
+      - ./docker/config/client.ovpn.template:/etc/openvpn/client.ovpn.template:ro
+    networks:
+      - vpn_network
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
 # Network configuration (dynamically allocated to prevent conflicts)
 networks:
   vpn_network:
+    name: openvpn-hardened_vpn_network

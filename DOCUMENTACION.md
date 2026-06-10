@@ -124,4 +124,29 @@ Para habilitar el despliegue automático al servidor destino, debes configurar l
 - `TARGET_SSH_KEY`: La clave privada SSH (completa) autorizada en el servidor destino.
 - `TARGET_PORT` *(Opcional)*: El puerto SSH del servidor destino (por defecto es `22`).
 - `TAILSCALE_AUTH_KEY` *(Opcional)*: Tu clave de autenticación de Tailscale (Auth Key o Ephemeral Key). Si se proporciona, el pipeline de GitHub Actions se conectará automáticamente a tu red privada (Tailnet) antes de realizar el despliegue por SSH, permitiendo conectarse de forma 100% segura a máquinas privadas sin exponerlas a Internet.
-## Git
+
+---
+
+## 7. Portal Web (Next.js) y Pruebas de Integración E2E
+
+### Portal Web de Acceso VPN (HTB-Style)
+El sistema incluye un portal web interactivo construido sobre **Next.js (App Router)** expuesto en el puerto **3000** del host:
+
+1. **Generación Dinámica de Perfiles:** El portal cuenta con un generador de nombres de hacker aleatorios (ej. `Ghost-Ninja-4832`) que asocia al perfil VPN generado.
+2. **Compilación de Certificados en Tiempo Real:** El endpoint API `/api/generate-vpn` lee los archivos criptográficos CA, el certificado del cliente, la clave del cliente y la clave de cifrado TLS-Crypt desde un volumen compartido de sólo lectura (`/etc/openvpn/pki`), los inyecta en la plantilla del cliente y entrega un archivo `.ovpn` personalizado listo para descargar: `<username>.ovpn`.
+3. **Mínimo Privilegio y Seguridad:** El contenedor del frontend se ejecuta bajo una arquitectura multi-etapa utilizando un usuario del sistema sin privilegios (`nextjs`). Los volúmenes montados son de sólo lectura (`ro`), garantizando la inmutabilidad de la PKI a nivel de aplicación web.
+
+### Pruebas de Integración Automatizadas (End-to-End)
+Para certificar que la configuración criptográfica del cluster es 100% operativa antes de su despliegue a producción, el script de integración `tests/integration-test.sh` realiza las siguientes acciones:
+
+1. **Bootstrap del Clúster:** Inicializa una PKI de pruebas temporal y arranca el entorno de Docker Compose de forma aislada.
+2. **Generación de Perfil de Cliente:** Compila un perfil de cliente inyectándole las credenciales de prueba generadas por la CA y apuntando al balanceador de carga `haproxy-lb`.
+3. **Simulación de Conexión Real:** Levanta un contenedor cliente OpenVPN (`vpn-client-test`) temporal adjunto a la red interna del clúster con la capabilidad de administrador de red (`NET_ADMIN`) y el dispositivo `/dev/net/tun` montado.
+4. **Verificación de Enrutamiento y Tráfico:**
+   - Confirma la existencia de la interfaz `tun0` en el contenedor del cliente.
+   - Verifica la asignación dinámica de una dirección IP privada dentro del rango esperado `10.8.x.x`.
+   - Realiza pings de ida y retorno al gateway del Nodo 1 (`10.8.1.1`) o Nodo 2 (`10.8.2.1`) para validar que el canal de datos criptográfico transporta paquetes bidireccionalmente.
+5. **Cierre de Ciclo:** Apaga el clúster de prueba y limpia todos los contenedores y perfiles temporales creados.
+
+Este script está integrado en el workflow de GitHub Actions como un paso **bloqueante** (`Run E2E Integration Tests`), de modo que si un cambio rompe el handshake SSL, el cifrado simétrico o el enrutamiento interno, el despliegue a producción se detiene de inmediato.
+

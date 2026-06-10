@@ -28,12 +28,15 @@ TAR_FILE="deploy.tar.gz"
 tar --exclude='docker/config/pki/ca.key' \
     --exclude='docker/config/pki/server-node*.key' \
     --exclude='docker/config/pki/client.key' \
+    --exclude='frontend/node_modules' \
+    --exclude='frontend/.next' \
     -czf "$TAR_FILE" \
     docker/ \
     haproxy/ \
     docker-compose.yml \
     tests/ \
-    scripts/
+    scripts/ \
+    frontend/
 
 echo "[INFO] Preparing remote directory structure on $TARGET_USER@$TARGET_HOST:$SSH_PORT..."
 ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no "$TARGET_USER@$TARGET_HOST" \
@@ -46,11 +49,6 @@ rm -f "$TAR_FILE"
 echo "[INFO] Extracting files and starting containers on target..."
 ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no "$TARGET_USER@$TARGET_HOST" << EOF
     cd "$DEPLOY_DIR"
-    
-    # Create isolated Docker config to bypass credential helper errors in non-interactive SSH sessions
-    mkdir -p docker_config
-    echo '{"auths": {}}' > docker_config/config.json
-    export DOCKER_CONFIG="\$(cygpath -w "\$(pwd)/docker_config")"
     
     echo "[INFO] Extracting release..."
     tar -xzf "$TAR_FILE"
@@ -71,7 +69,7 @@ ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no "$TARGET_USER@
     sleep 5
     
     echo "[INFO] Verifying container status..."
-    if ! docker ps | grep -E "haproxy-lb|openvpn-node1|openvpn-node2"; then
+    if ! docker ps | grep -E "haproxy-lb|openvpn-node1|openvpn-node2|vpn-frontend"; then
         echo "[ERROR] One or more containers failed to start!"
         docker ps -a
         exit 1
