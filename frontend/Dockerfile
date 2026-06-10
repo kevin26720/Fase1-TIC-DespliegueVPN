@@ -5,7 +5,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Upgrade npm to latest version for security and performance
-RUN npm install -g npm@latest
+RUN apk update && apk upgrade --no-cache && npm install -g npm@latest
 
 # Copy package configurations and install dependencies
 COPY package.json package-lock.json ./
@@ -22,7 +22,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Upgrade pre-installed npm to resolve CVEs in its transitive dependencies (cross-spawn, glob, minimatch, tar)
-RUN npm install -g npm@latest
+RUN apk update && apk upgrade --no-cache && npm install -g npm@latest
 
 ENV NODE_ENV=production
 ENV PORT=3000
