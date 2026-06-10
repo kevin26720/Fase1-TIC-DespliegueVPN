@@ -48,6 +48,7 @@ rm -f "$TAR_FILE"
 
 echo "[INFO] Extracting files and starting containers on target..."
 ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no "$TARGET_USER@$TARGET_HOST" << EOF
+    set -e
     cd "$DEPLOY_DIR"
     
     echo "[INFO] Extracting release..."
@@ -55,8 +56,8 @@ ssh -p "$SSH_PORT" -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=no "$TARGET_USER@
     rm -f "$TAR_FILE"
     
     # Check if a production PKI exists. If not, generate one for bootstrap/testing.
-    if [ ! -f "docker/config/pki/ca.crt" ]; then
-        echo "[WARNING] No PKI keys found on target. Executing local PKI bootstrap for testing..."
+    if [ ! -f "docker/config/pki/ca.crt" ] || [ ! -f "docker/config/pki/server-node1.key" ] || [ ! -f "docker/config/pki/client.key" ]; then
+        echo "[WARNING] Missing PKI key files on target. Executing local PKI bootstrap for testing..."
         chmod +x scripts/init-pki.sh
         ./scripts/init-pki.sh
     fi

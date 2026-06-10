@@ -68,6 +68,9 @@ keyUsage               = critical, digitalSignature
 extendedKeyUsage       = clientAuth
 EOF
 
+# Set local OPENSSL_CONF to bypass invalid system-wide configurations
+export OPENSSL_CONF="$WORKDIR/openssl.cnf"
+
 # 1. Generate CA Certificate
 echo "[INFO] Generating CA private key and self-signed certificate..."
 openssl genrsa -out "$PKI_DIR/ca.key" 4096
