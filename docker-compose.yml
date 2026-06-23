@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ==========================================
   # HAProxy Load Balancer (TCP Sticky Sessions)
