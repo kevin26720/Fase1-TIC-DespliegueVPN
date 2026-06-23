@@ -109,17 +109,22 @@ trap 'rm -rf docker_config_headless' EXIT
 echo "[INFO] Stopping existing containers..."
 docker compose down --remove-orphans 2>/dev/null || docker-compose down --remove-orphans 2>/dev/null || true
 
-echo "[INFO] Building images (using local cache, no registry contact)..."
-# Compose v5 removed --no-pull from 'build'; default behaviour is already
-# to NOT force-pull base images if they exist locally.
-# We rely on the WSL2 daemon config patch above to block any credential calls.
+echo "[INFO] Pulling external images (logto, postgres) that have no build context..."
+# These images are pulled separately before compose build so the daemon
+# already has them cached when compose resolves the stack.
+docker pull svhd/logto:latest || echo "[WARN] Could not pull svhd/logto:latest"
+docker pull postgres:17-alpine || echo "[WARN] Could not pull postgres:17-alpine"
+
+echo "[INFO] Building custom images (using local cache, no registry contact)..."
+# Compose v5: omitting --pull flag = use cached base images (default)
+# The WSL2 daemon config patch above blocks any credential calls.
 docker compose build
 
 echo "[INFO] Starting containers (images already built)..."
 docker compose up -d --no-build || docker-compose up -d
 
-echo "[INFO] Waiting for containers to initialize..."
-sleep 15
+echo "[INFO] Waiting for containers to initialize (Logto needs ~60s for DB seed)..."
+sleep 75
 
 echo "[INFO] Verifying container status..."
 # docker compose ps is scoped to THIS project only — avoids false negatives

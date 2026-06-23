@@ -139,7 +139,8 @@ services:
       dockerfile: Dockerfile
     container_name: vpn-frontend
     depends_on:
-      - logto
+      logto:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
@@ -148,6 +149,9 @@ services:
       - LOGTO_ENDPOINT=http://security-logto:3001
       - LOGTO_BASE_URL=http://localhost:3000
       - LOGTO_COOKIE_SECRET=${LOGTO_COOKIE_SECRET:-5MpID6PGAaoygBvHyjU3e90a0g72zozo}
+      # Next.js standalone server must bind to 0.0.0.0 to be reachable outside the container
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
     volumes:
       - ./docker/config/pki:/etc/openvpn/pki:ro
       - ./docker/config/client.ovpn.template:/etc/openvpn/client.ovpn.template:ro
@@ -202,6 +206,13 @@ services:
     networks:
       - vpn_network
     restart: unless-stopped
+    healthcheck:
+      # Logto exposes a /api/status endpoint on port 3001 when ready
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
 # Network configuration (dynamically allocated to prevent conflicts)
 networks:
