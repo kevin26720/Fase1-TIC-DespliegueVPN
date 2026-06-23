@@ -88,6 +88,16 @@ printf '{"auths": {}}' > docker_config_headless/config.json
 export DOCKER_CONFIG="$(cygpath -m "$(pwd)/docker_config_headless")"
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
+
+# Create a mock credential helper to intercept and bypass wincred calls
+cat << 'BATCH' > docker_config_headless/docker-credential-desktop.bat
+@echo off
+echo {}
+exit /b 0
+BATCH
+cp docker_config_headless/docker-credential-desktop.bat docker_config_headless/docker-credential-desktop.cmd
+export PATH="$(cygpath -m "$(pwd)/docker_config_headless"):$PATH"
+
 # Clean up the temp config on exit
 trap 'rm -rf docker_config_headless' EXIT
 
