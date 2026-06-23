@@ -83,13 +83,13 @@ fi
 # haproxy, postgres, svhd/logto) and do not require authentication.
 # -------------------------------------------------------------------
 echo "[INFO] Configuring Docker for headless SSH session (bypassing wincred)..."
-DOCKER_CONFIG_HEADLESS="$(cygpath -m "$(mktemp -d)")"
-printf '{"auths": {}}' > "$DOCKER_CONFIG_HEADLESS/config.json"
-export DOCKER_CONFIG="$DOCKER_CONFIG_HEADLESS"
+mkdir -p docker_config_headless
+printf '{"auths": {}}' > docker_config_headless/config.json
+export DOCKER_CONFIG="$(cygpath -m "$(pwd)/docker_config_headless")"
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
 # Clean up the temp config on exit
-trap 'rm -rf "$DOCKER_CONFIG_HEADLESS"' EXIT
+trap 'rm -rf docker_config_headless' EXIT
 
 echo "[INFO] Building and starting containers via Docker Compose..."
 docker compose down --remove-orphans 2>/dev/null || docker-compose down --remove-orphans 2>/dev/null || true
