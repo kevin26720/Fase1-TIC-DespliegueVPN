@@ -83,24 +83,39 @@ fi
 # belt-and-suspenders measure.
 # -------------------------------------------------------------------
 echo "[INFO] Configuring Docker for headless SSH session (bypassing wincred)..."
+
+# KEY FIX: The Docker daemon runs INSIDE Docker Desktop's WSL2 Linux VM
+# ('docker-desktop' distro). It reads /root/.docker/config.json from INSIDE
+# that VM — not from Windows env vars nor from the host filesystem.
+# We must patch that file directly via wsl.exe to disable the wincred helper
+# at the daemon level. All previous workarounds failed because they only
+# affected the Windows-side CLI process, not the daemon itself.
+echo "[INFO] Patching Docker daemon config inside WSL2 VM..."
+wsl.exe -d docker-desktop -- sh -c \
+  "mkdir -p /root/.docker && printf '{\"auths\":{},\"credsStore\":\"\"}' > /root/.docker/config.json" \
+  2>/dev/null && echo "[INFO] WSL2 daemon config patched OK." || \
+  echo "[WARN] Could not patch WSL2 daemon config via wsl.exe (will continue anyway)."
+
+# Belt-and-suspenders: also isolate the CLI config for this SSH session
 mkdir -p docker_config_headless
 printf '{"auths":{},"credsStore":""}' > docker_config_headless/config.json
 export DOCKER_CONFIG="$(cygpath -m "$(pwd)/docker_config_headless" 2>/dev/null || echo "$(pwd)/docker_config_headless")"
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
 
-# Clean up the temp config on exit
+# Clean up on exit
 trap 'rm -rf docker_config_headless' EXIT
 
 echo "[INFO] Stopping existing containers..."
 docker compose down --remove-orphans 2>/dev/null || docker-compose down --remove-orphans 2>/dev/null || true
 
-echo "[INFO] Building images (--no-pull prevents any registry contact)..."
-# --no-pull -> use ONLY locally cached base images, never contact the registry
-# --no-cache is intentionally NOT used so that layer cache is reused
-docker compose build --no-pull || docker-compose build --pull=false
+echo "[INFO] Building images (using local cache, no registry contact)..."
+# Compose v5 removed --no-pull from 'build'; default behaviour is already
+# to NOT force-pull base images if they exist locally.
+# We rely on the WSL2 daemon config patch above to block any credential calls.
+docker compose build
 
-echo "[INFO] Starting containers (no build, images are ready)..."
+echo "[INFO] Starting containers (images already built)..."
 docker compose up -d --no-build || docker-compose up -d
 
 echo "[INFO] Waiting for containers to initialize..."
