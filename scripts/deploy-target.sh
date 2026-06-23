@@ -74,45 +74,34 @@ fi
 # command that touches the registry fails with:
 #   "A specified logon session does not exist."
 #
-# Root-cause fix: override DOCKER_CONFIG to a temporary directory
-# containing a minimal config.json with NO credsStore entry.
-# Docker then uses anonymous (file-based) auth for all image pulls,
-# which works correctly in headless/SSH environments.
+# Root-cause fix: use --pull=never during docker compose build so the
+# build daemon (which runs inside Docker Desktop's Linux VM and does
+# NOT inherit environment variables from the SSH host shell) never
+# contacts any registry. All base images must be pre-pulled locally.
 #
-# All images used in this project are public (alpine, node-alpine,
-# haproxy, postgres, svhd/logto) and do not require authentication.
+# Additionally we disable BuildKit and isolate DOCKER_CONFIG as a
+# belt-and-suspenders measure.
 # -------------------------------------------------------------------
 echo "[INFO] Configuring Docker for headless SSH session (bypassing wincred)..."
 mkdir -p docker_config_headless
-printf '{"auths": {}}' > docker_config_headless/config.json
-export DOCKER_CONFIG="$(cygpath -m "$(pwd)/docker_config_headless")"
+printf '{"auths":{},"credsStore":""}' > docker_config_headless/config.json
+export DOCKER_CONFIG="$(cygpath -m "$(pwd)/docker_config_headless" 2>/dev/null || echo "$(pwd)/docker_config_headless")"
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
-
-# Create a mock credential helper to intercept and bypass wincred calls
-cat << 'BATCH' > docker_config_headless/docker-credential-desktop.bat
-@echo off
-echo {}
-exit /b 0
-BATCH
-cp docker_config_headless/docker-credential-desktop.bat docker_config_headless/docker-credential-desktop.cmd
-
-cat << 'BASH' > docker_config_headless/docker-credential-desktop
-#!/bin/sh
-echo "{}"
-exit 0
-BASH
-chmod +x docker_config_headless/docker-credential-desktop
-
-# Prepend using POSIX-style path so Git Bash automatically converts the PATH list to Windows format (using semicolons) for Windows binaries
-export PATH="$(pwd)/docker_config_headless:$PATH"
 
 # Clean up the temp config on exit
 trap 'rm -rf docker_config_headless' EXIT
 
-echo "[INFO] Building and starting containers via Docker Compose..."
+echo "[INFO] Stopping existing containers..."
 docker compose down --remove-orphans 2>/dev/null || docker-compose down --remove-orphans 2>/dev/null || true
-docker compose up --build -d || docker-compose up --build -d
+
+echo "[INFO] Building images (--pull=never prevents any registry contact)..."
+# --pull=never  -> use ONLY locally cached base images, never contact the registry
+# --no-cache is intentionally NOT used so that layer cache is reused
+docker compose build --pull=never || docker-compose build --pull=never
+
+echo "[INFO] Starting containers (no build, images are ready)..."
+docker compose up -d --no-build || docker-compose up -d
 
 echo "[INFO] Waiting for containers to initialize..."
 sleep 15
