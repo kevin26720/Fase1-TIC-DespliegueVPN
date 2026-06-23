@@ -83,7 +83,7 @@ fi
 # haproxy, postgres, svhd/logto) and do not require authentication.
 # -------------------------------------------------------------------
 echo "[INFO] Configuring Docker for headless SSH session (bypassing wincred)..."
-DOCKER_CONFIG_HEADLESS="$(mktemp -d)"
+DOCKER_CONFIG_HEADLESS="$(cygpath -w "$(mktemp -d)")"
 printf '{"auths": {}}' > "$DOCKER_CONFIG_HEADLESS/config.json"
 export DOCKER_CONFIG="$DOCKER_CONFIG_HEADLESS"
 # Clean up the temp config on exit
