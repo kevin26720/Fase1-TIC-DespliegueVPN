@@ -96,7 +96,16 @@ echo {}
 exit /b 0
 BATCH
 cp docker_config_headless/docker-credential-desktop.bat docker_config_headless/docker-credential-desktop.cmd
-export PATH="$(cygpath -m "$(pwd)/docker_config_headless"):$PATH"
+
+cat << 'BASH' > docker_config_headless/docker-credential-desktop
+#!/bin/sh
+echo "{}"
+exit 0
+BASH
+chmod +x docker_config_headless/docker-credential-desktop
+
+# Prepend using POSIX-style path so Git Bash automatically converts the PATH list to Windows format (using semicolons) for Windows binaries
+export PATH="$(pwd)/docker_config_headless:$PATH"
 
 # Clean up the temp config on exit
 trap 'rm -rf docker_config_headless' EXIT
