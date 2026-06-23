@@ -95,10 +95,10 @@ trap 'rm -rf docker_config_headless' EXIT
 echo "[INFO] Stopping existing containers..."
 docker compose down --remove-orphans 2>/dev/null || docker-compose down --remove-orphans 2>/dev/null || true
 
-echo "[INFO] Building images (--pull=never prevents any registry contact)..."
-# --pull=never  -> use ONLY locally cached base images, never contact the registry
+echo "[INFO] Building images (--no-pull prevents any registry contact)..."
+# --no-pull -> use ONLY locally cached base images, never contact the registry
 # --no-cache is intentionally NOT used so that layer cache is reused
-docker compose build --pull=never || docker-compose build --pull=never
+docker compose build --no-pull || docker-compose build --pull=false
 
 echo "[INFO] Starting containers (no build, images are ready)..."
 docker compose up -d --no-build || docker-compose up -d
